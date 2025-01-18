@@ -1,11 +1,124 @@
 "use client"
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Select } from '@/components/ui/select';
-import { ArrowUpIcon, ArrowDownIcon } from 'lucide-react';
+import { DndProvider, useDrag, useDrop } from 'react-dnd';
+import { HTML5Backend } from 'react-dnd-html5-backend';
+import { 
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { GripVertical } from "lucide-react";
+
+const DraggableSection = ({ id, index, moveSection, children }) => {
+  const [{ isDragging }, drag] = useDrag({
+    type: 'section',
+    item: { id, index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  const [, drop] = useDrop({
+    accept: 'section',
+    hover: (item, monitor) => {
+      if (!item) return;
+      const dragIndex = item.index;
+      const hoverIndex = index;
+      if (dragIndex === hoverIndex) return;
+      moveSection(dragIndex, hoverIndex);
+      item.index = hoverIndex;
+    },
+  });
+
+  return (
+    <Card className={`mb-6 ${isDragging ? 'opacity-50 border-dashed' : ''}`}>
+      <CardContent className="p-6">
+        <div ref={(node) => drag(drop(node))} className="relative">
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 cursor-move">
+            <GripVertical className="h-5 w-5 text-gray-400" />
+          </div>
+          <div className="ml-8">{children}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+const StyleControls = ({ section, template, onStyleChange }) => {
+  const fontSizes = [
+    { label: 'Small', value: '14px' },
+    { label: 'Medium', value: '16px' },
+    { label: 'Large', value: '18px' },
+    { label: 'Extra Large', value: '24px' },
+  ];
+
+  const alignments = [
+    { label: 'Left', value: 'left' },
+    { label: 'Center', value: 'center' },
+    { label: 'Right', value: 'right' },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-4 mt-4">
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">Color</label>
+        <Input
+          type="color"
+          value={template.style[`${section}Color`]}
+          onChange={(e) => onStyleChange(section, 'Color', e.target.value)}
+          className="h-9 w-full"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">Size</label>
+        <Select
+          value={template.style[`${section}Size`]}
+          onValueChange={(value) => onStyleChange(section, 'Size', value)}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {fontSizes.map(size => (
+              <SelectItem key={size.value} value={size.value}>
+                {size.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">Alignment</label>
+        <Select
+          value={template.style[`${section}Alignment`]}
+          onValueChange={(value) => onStyleChange(section, 'Alignment', value)}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {alignments.map(align => (
+              <SelectItem key={align.value} value={align.value}>
+                {align.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+};
 
 const EmailBuilder = () => {
   const [template, setTemplate] = useState({
@@ -15,16 +128,41 @@ const EmailBuilder = () => {
     footer: '',
     style: {
       titleColor: '#000000',
+      titleSize: '24px',
+      titleAlignment: 'left',
       contentColor: '#000000',
-      fontSize: '16px',
-      alignment: 'left'
+      contentSize: '16px',
+      contentAlignment: 'left',
+      footerColor: '#000000',
+      footerSize: '14px',
+      footerAlignment: 'center',
+      backgroundColor: '#ffffff',
     }
   });
 
   const [sections, setSections] = useState(['title', 'image', 'content', 'footer']);
   const [preview, setPreview] = useState('');
-  const [savedTemplates, setSavedTemplates] = useState([]);
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [uploading, setUploading] = useState(false);
+
+  const moveSection = (dragIndex, hoverIndex) => {
+    const newSections = [...sections];
+    const draggedItem = newSections[dragIndex];
+    newSections.splice(dragIndex, 1);
+    newSections.splice(hoverIndex, 0, draggedItem);
+    setSections(newSections);
+  };
+
+  const handleStyleChange = (section, property, value) => {
+    setTemplate(prev => ({
+      ...prev,
+      style: {
+        ...prev.style,
+        [`${section}${property}`]: value
+      }
+    }));
+  };
+
+  const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -38,9 +176,7 @@ const EmailBuilder = () => {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
+      if (!response.ok) throw new Error('Upload failed');
 
       const data = await response.json();
       setTemplate(prev => ({
@@ -55,240 +191,561 @@ const EmailBuilder = () => {
     }
   };
 
-  useEffect(() => {
-    fetchEmailLayout();
-    fetchSavedTemplates();
-  }, []);
-
-  const fetchEmailLayout = async () => {
-    try {
-      const response = await fetch('/api/emailLayout');
-      const data = await response.json();
-      setPreview(data.layout);
-    } catch (error) {
-      console.error('Failed to fetch layout:', error);
-    }
-  };
-
-  const fetchSavedTemplates = async () => {
-    try {
-      const response = await fetch('/api/templates');
-      const data = await response.json();
-      setSavedTemplates(data);
-    } catch (error) {
-      console.error('Failed to fetch templates:', error);
-    }
-  };
-
-  const handleSaveTemplate = async () => {
-    try {
-      const response = await fetch('/api/templates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(template),
-      });
-      
-      if (response.ok) {
-        alert('Template saved successfully!');
-        fetchSavedTemplates();
-      }
-    } catch (error) {
-      console.error('Failed to save template:', error);
-    }
-  };
-
-  const handleDownload = async () => {
-    try {
-      const response = await fetch('/api/render', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(template),
-      });
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'email-template.html';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to download template:', error);
-    }
-  };
-
-  const moveSection = (index: number, direction: 'up' | 'down') => {
-    const newSections = [...sections];
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    
-    if (newIndex >= 0 && newIndex < sections.length) {
-      [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
-      setSections(newSections);
-    }
-  };
-
-  const renderSection = (section: string, index: number) => {
-    const canMoveUp = index > 0;
-    const canMoveDown = index < sections.length - 1;
-
-    return (
-      <div key={section} className="relative p-4 border rounded mb-4">
-        <div className="absolute right-2 top-2 flex gap-2">
-          {canMoveUp && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => moveSection(index, 'up')}
-            >
-              <ArrowUpIcon className="h-4 w-4" />
-            </Button>
-          )}
-          {canMoveDown && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => moveSection(index, 'down')}
-            >
-              <ArrowDownIcon className="h-4 w-4" />
-            </Button>
-          )}
+  const renderSectionContent = (section) => {
+    const components = {
+      title: (
+        <div className="space-y-4">
+          <Input
+            value={template.title}
+            onChange={(e) => setTemplate({ ...template, title: e.target.value })}
+            placeholder="Enter email title"
+            className="w-full"
+          />
+          <StyleControls 
+            section="title" 
+            template={template} 
+            onStyleChange={handleStyleChange}
+          />
         </div>
-        {renderSectionContent(section)}
-      </div>
-    );
-  };
-
-  const renderSectionContent = (section: string) => {
-    switch (section) {
-      case 'title':
-        return (
-          <div className="space-y-4">
-            <Input
-              value={template.title}
-              onChange={(e) => setTemplate({ ...template, title: e.target.value })}
-              placeholder="Enter email title"
-            />
-            <Input
-              type="color"
-              value={template.style.titleColor}
-              onChange={(e) => setTemplate({
-                ...template,
-                style: { ...template.style, titleColor: e.target.value }
-              })}
-            />
-          </div>
-        );
-      case 'content':
-        return (
-          <div className="space-y-4">
-            <Textarea
-              value={template.content}
-              onChange={(e) => setTemplate({ ...template, content: e.target.value })}
-              placeholder="Enter email content"
-              rows={6}
-            />
-            <div className="flex gap-4">
-              <Input
-                type="color"
-                value={template.style.contentColor}
-                onChange={(e) => setTemplate({
-                  ...template,
-                  style: { ...template.style, contentColor: e.target.value }
-                })}
-              />
-              <Select
-                value={template.style.fontSize}
-                onChange={(e) => setTemplate({
-                  ...template,
-                  style: { ...template.style, fontSize: e.target.value }
-                })}
-              >
-                <option value="14px">Small</option>
-                <option value="16px">Medium</option>
-                <option value="18px">Large</option>
-              </Select>
-              <Select
-                value={template.style.alignment}
-                onChange={(e) => setTemplate({
-                  ...template,
-                  style: { ...template.style, alignment: e.target.value }
-                })}
-              >
-                <option value="left">Left</option>
-                <option value="center">Center</option>
-                <option value="right">Right</option>
-              </Select>
-            </div>
-          </div>
-        );
-      case 'image':
-        return (
-          <div>
-            <Input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-            />
-            {template.imageUrl && (
-              <img
-                src={template.imageUrl}
-                alt="Template"
-                className="mt-4 max-w-full h-auto"
-              />
-            )}
-          </div>
-        );
-      case 'footer':
-        return (
+      ),
+      content: (
+        <div className="space-y-4">
+          <Textarea
+            value={template.content}
+            onChange={(e) => setTemplate({ ...template, content: e.target.value })}
+            placeholder="Enter email content"
+            rows={6}
+            className="w-full"
+          />
+          <StyleControls 
+            section="content" 
+            template={template} 
+            onStyleChange={handleStyleChange}
+          />
+        </div>
+      ),
+      footer: (
+        <div className="space-y-4">
           <Input
             value={template.footer}
             onChange={(e) => setTemplate({ ...template, footer: e.target.value })}
             placeholder="Enter footer text"
+            className="w-full"
           />
-        );
-      default:
-        return null;
-    }
+          <StyleControls 
+            section="footer" 
+            template={template} 
+            onStyleChange={handleStyleChange}
+          />
+        </div>
+      ),
+      image: (
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              disabled={uploading}
+              className="w-full"
+            />
+            {uploading && <span className="text-sm text-gray-500">Uploading...</span>}
+          </div>
+          {template.imageUrl && (
+            <div className="space-y-2">
+              <img
+                src={template.imageUrl}
+                alt="Template"
+                className="max-w-full h-auto rounded-lg"
+              />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setTemplate(prev => ({ ...prev, imageUrl: '' }))}
+              >
+                Remove Image
+              </Button>
+            </div>
+          )}
+        </div>
+      )
+    };
+
+    return components[section] || null;
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <div className="flex-1 p-8">
-        <Card>
-          <CardContent className="p-6">
-            {sections.map((section, index) => renderSection(section, index))}
-            <div className="flex gap-4 mt-6">
-              <Button onClick={handleSaveTemplate}>Save Template</Button>
-              <Button onClick={handleDownload}>Download HTML</Button>
-            </div>
-          </CardContent>
-        </Card>
+    <DndProvider backend={HTML5Backend}>
+      <div className="flex min-h-screen bg-gray-50 p-8 gap-8">
+        <div className="flex-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Email Template Builder</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Background Color</label>
+                <Input
+                  type="color"
+                  value={template.style.backgroundColor}
+                  onChange={(e) => setTemplate(prev => ({
+                    ...prev,
+                    style: { ...prev.style, backgroundColor: e.target.value }
+                  }))}
+                  className="h-9 w-32"
+                />
+              </div>
+              
+              {sections.map((section, index) => (
+                <DraggableSection
+                  key={section}
+                  id={section}
+                  index={index}
+                  moveSection={moveSection}
+                >
+                  {renderSectionContent(section)}
+                </DraggableSection>
+              ))}
+              
+              <div className="flex gap-4 pt-4">
+                <Button 
+                  className="w-full"
+                  onClick={() => console.log('Save template:', template)}
+                >
+                  Save Template
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="w-full"
+                >
+                  Preview
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <div className="flex-1">
+          <Card>
+            <CardHeader>
+              <CardTitle>Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div 
+                className="preview-container p-6 rounded-lg"
+                style={{ backgroundColor: template.style.backgroundColor }}
+              >
+                <div 
+                  className="mb-6"
+                  style={{
+                    color: template.style.titleColor,
+                    fontSize: template.style.titleSize,
+                    textAlign: template.style.titleAlignment,
+                  }}
+                >
+                  {template.title || <span className="text-gray-400">Email Title</span>}
+                </div>
+                
+                {template.imageUrl && (
+                  <img 
+                    src={template.imageUrl} 
+                    alt="Template" 
+                    className="my-6 max-w-full rounded-lg" 
+                  />
+                )}
+                
+                <div 
+                  className="mb-6"
+                  style={{
+                    color: template.style.contentColor,
+                    fontSize: template.style.contentSize,
+                    textAlign: template.style.contentAlignment,
+                  }}
+                >
+                  {template.content || <span className="text-gray-400">Email Content</span>}
+                </div>
+                
+                <div 
+                  className="mt-8"
+                  style={{
+                    color: template.style.footerColor,
+                    fontSize: template.style.footerSize,
+                    textAlign: template.style.footerAlignment,
+                  }}
+                >
+                  {template.footer || <span className="text-gray-400">Footer Text</span>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-      
-      <div className="flex-1 p-8">
-        <Card>
-          <CardContent className="p-6">
-            <div 
-              className="preview-container"
-              dangerouslySetInnerHTML={{ 
-                __html: preview
-                  .replace('{{title}}', template.title)
-                  .replace('{{content}}', template.content)
-                  .replace('{{imageUrl}}', template.imageUrl)
-                  .replace('{{footer}}', template.footer)
-              }} 
-            />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    </DndProvider>
   );
 };
 
 export default EmailBuilder;
+
+// import React, { useState, useEffect } from 'react';
+// import { DndProvider, useDrag, useDrop } from 'react-dnd';
+// import { HTML5Backend } from 'react-dnd-html5-backend';
+// import { 
+//   Card,
+//   CardContent
+// } from "@/components/ui/card";
+// import {
+//   Select,
+//   SelectContent,
+//   SelectItem,
+//   SelectTrigger,
+//   SelectValue,
+// } from "@/components/ui/select";
+// import { Input } from "@/components/ui/input";
+// import { Button } from "@/components/ui/button";
+// import { Textarea } from "@/components/ui/textarea";
+// import { GripVertical } from "lucide-react";
+
+// // Define the DraggableSection component
+// const DraggableSection = ({ id, index, moveSection, children }) => {
+//   const [{ isDragging }, drag] = useDrag({
+//     type: 'section',
+//     item: { id, index },
+//     collect: (monitor) => ({
+//       isDragging: monitor.isDragging(),
+//     }),
+//   });
+
+//   const [, drop] = useDrop({
+//     accept: 'section',
+//     hover: (item, monitor) => {
+//       if (!item) return;
+      
+//       const dragIndex = item.index;
+//       const hoverIndex = index;
+
+//       if (dragIndex === hoverIndex) return;
+//       moveSection(dragIndex, hoverIndex);
+//       item.index = hoverIndex;
+//     },
+//   });
+
+//   return (
+//     <div
+//       ref={(node) => drag(drop(node))}
+//       className={`relative p-4 border rounded mb-4 ${
+//         isDragging ? 'opacity-50 border-dashed' : ''
+//       }`}
+//     >
+//       <div className="absolute left-2 top-1/2 -translate-y-1/2 cursor-move">
+//         <GripVertical className="h-5 w-5 text-gray-400" />
+//       </div>
+//       <div className="ml-8">{children}</div>
+//     </div>
+//   );
+// };
+
+// // Define the StyleControls component
+// const StyleControls = ({ section, template, onStyleChange }) => {
+//   const fontSizes = [
+//     { label: 'Small', value: '14px' },
+//     { label: 'Medium', value: '16px' },
+//     { label: 'Large', value: '18px' },
+//     { label: 'Extra Large', value: '24px' },
+//   ];
+
+//   const alignments = [
+//     { label: 'Left', value: 'left' },
+//     { label: 'Center', value: 'center' },
+//     { label: 'Right', value: 'right' },
+//   ];
+
+//   return (
+//     <div className="grid grid-cols-3 gap-4 mt-2">
+//       <div>
+//         <label className="text-sm text-gray-600 mb-1 block">Color</label>
+//         <Input
+//           type="color"
+//           value={template.style[`${section}Color`]}
+//           onChange={(e) => onStyleChange(section, 'Color', e.target.value)}
+//           className="h-8 w-full"
+//         />
+//       </div>
+//       <div>
+//         <label className="text-sm text-gray-600 mb-1 block">Size</label>
+//         <Select
+//           value={template.style[`${section}Size`]}
+//           onValueChange={(value) => onStyleChange(section, 'Size', value)}
+//         >
+//           <SelectTrigger>
+//             <SelectValue />
+//           </SelectTrigger>
+//           <SelectContent>
+//             {fontSizes.map(size => (
+//               <SelectItem key={size.value} value={size.value}>
+//                 {size.label}
+//               </SelectItem>
+//             ))}
+//           </SelectContent>
+//         </Select>
+//       </div>
+//       <div>
+//         <label className="text-sm text-gray-600 mb-1 block">Alignment</label>
+//         <Select
+//           value={template.style[`${section}Alignment`]}
+//           onValueChange={(value) => onStyleChange(section, 'Alignment', value)}
+//         >
+//           <SelectTrigger>
+//             <SelectValue />
+//           </SelectTrigger>
+//           <SelectContent>
+//             {alignments.map(align => (
+//               <SelectItem key={align.value} value={align.value}>
+//                 {align.label}
+//               </SelectItem>
+//             ))}
+//           </SelectContent>
+//         </Select>
+//       </div>
+//     </div>
+//   );
+// };
+
+// const EmailBuilder = () => {
+//   const [template, setTemplate] = useState({
+//     title: '',
+//     content: '',
+//     imageUrl: '',
+//     footer: '',
+//     style: {
+//       titleColor: '#000000',
+//       titleSize: '24px',
+//       titleAlignment: 'left',
+//       contentColor: '#000000',
+//       contentSize: '16px',
+//       contentAlignment: 'left',
+//       footerColor: '#000000',
+//       footerSize: '14px',
+//       footerAlignment: 'center',
+//       backgroundColor: '#ffffff',
+//     }
+//   });
+
+//   const [sections, setSections] = useState(['title', 'image', 'content', 'footer']);
+//   const [preview, setPreview] = useState('');
+//   const [uploading, setUploading] = useState(false);
+
+//   const moveSection = (dragIndex, hoverIndex) => {
+//     const newSections = [...sections];
+//     const draggedItem = newSections[dragIndex];
+//     newSections.splice(dragIndex, 1);
+//     newSections.splice(hoverIndex, 0, draggedItem);
+//     setSections(newSections);
+//   };
+
+//   const handleStyleChange = (section, property, value) => {
+//     setTemplate(prev => ({
+//       ...prev,
+//       style: {
+//         ...prev.style,
+//         [`${section}${property}`]: value
+//       }
+//     }));
+//   };
+
+//   const handleImageUpload = async (e) => {
+//     const file = e.target.files?.[0];
+//     if (!file) return;
+
+//     setUploading(true);
+//     const formData = new FormData();
+//     formData.append('file', file);
+
+//     try {
+//       const response = await fetch('/api/uploadImage', {
+//         method: 'POST',
+//         body: formData,
+//       });
+
+//       if (!response.ok) throw new Error('Upload failed');
+
+//       const data = await response.json();
+//       setTemplate(prev => ({
+//         ...prev,
+//         imageUrl: data.url
+//       }));
+//     } catch (error) {
+//       console.error('Failed to upload image:', error);
+//       alert('Failed to upload image. Please try again.');
+//     } finally {
+//       setUploading(false);
+//     }
+//   };
+
+//   const renderSectionContent = (section) => {
+//     switch (section) {
+//       case 'title':
+//         return (
+//           <div>
+//             <Input
+//               value={template.title}
+//               onChange={(e) => setTemplate({ ...template, title: e.target.value })}
+//               placeholder="Enter email title"
+//               className="mb-2"
+//             />
+//             <StyleControls 
+//               section="title" 
+//               template={template} 
+//               onStyleChange={handleStyleChange}
+//             />
+//           </div>
+//         );
+//       case 'content':
+//         return (
+//           <div>
+//             <Textarea
+//               value={template.content}
+//               onChange={(e) => setTemplate({ ...template, content: e.target.value })}
+//               placeholder="Enter email content"
+//               rows={6}
+//               className="mb-2"
+//             />
+//             <StyleControls 
+//               section="content" 
+//               template={template} 
+//               onStyleChange={handleStyleChange}
+//             />
+//           </div>
+//         );
+//       case 'footer':
+//         return (
+//           <div>
+//             <Input
+//               value={template.footer}
+//               onChange={(e) => setTemplate({ ...template, footer: e.target.value })}
+//               placeholder="Enter footer text"
+//               className="mb-2"
+//             />
+//             <StyleControls 
+//               section="footer" 
+//               template={template} 
+//               onStyleChange={handleStyleChange}
+//             />
+//           </div>
+//         );
+//       case 'image':
+//         return (
+//           <div>
+//             <div className="flex items-center gap-4">
+//               <Input
+//                 type="file"
+//                 accept="image/*"
+//                 onChange={handleImageUpload}
+//                 disabled={uploading}
+//               />
+//               {uploading && <span className="text-sm text-gray-500">Uploading...</span>}
+//             </div>
+//             {template.imageUrl && (
+//               <div className="mt-4">
+//                 <img
+//                   src={template.imageUrl}
+//                   alt="Template"
+//                   className="max-w-full h-auto"
+//                 />
+//                 <Button 
+//                   variant="outline" 
+//                   size="sm" 
+//                   className="mt-2"
+//                   onClick={() => setTemplate(prev => ({ ...prev, imageUrl: '' }))}
+//                 >
+//                   Remove Image
+//                 </Button>
+//               </div>
+//             )}
+//           </div>
+//         );
+//       default:
+//         return null;
+//     }
+//   };
+
+//   return (
+//     <DndProvider backend={HTML5Backend}>
+//       <div className="flex min-h-screen bg-gray-100">
+//         <div className="flex-1 p-8">
+//           <Card>
+//             <CardContent className="p-6">
+//               <div className="mb-6">
+//                 <label className="text-sm text-gray-600 mb-1 block">Background Color</label>
+//                 <Input
+//                   type="color"
+//                   value={template.style.backgroundColor}
+//                   onChange={(e) => setTemplate(prev => ({
+//                     ...prev,
+//                     style: { ...prev.style, backgroundColor: e.target.value }
+//                   }))}
+//                   className="h-8 w-32"
+//                 />
+//               </div>
+              
+//               {sections.map((section, index) => (
+//                 <DraggableSection
+//                   key={section}
+//                   id={section}
+//                   index={index}
+//                   moveSection={moveSection}
+//                 >
+//                   {renderSectionContent(section)}
+//                 </DraggableSection>
+//               ))}
+              
+//               <div className="flex gap-4 mt-6">
+//                 <Button onClick={() => console.log('Save template:', template)}>
+//                   Save Template
+//                 </Button>
+//                 <Button variant="outline">Preview</Button>
+//               </div>
+//             </CardContent>
+//           </Card>
+//         </div>
+        
+//         <div className="flex-1 p-8">
+//           <Card>
+//             <CardContent className="p-6">
+//               <div 
+//                 className="preview-container"
+//                 style={{ backgroundColor: template.style.backgroundColor }}
+//               >
+//                 <div style={{
+//                   color: template.style.titleColor,
+//                   fontSize: template.style.titleSize,
+//                   textAlign: template.style.titleAlignment,
+//                 }}>
+//                   {template.title}
+//                 </div>
+//                 {template.imageUrl && (
+//                   <img src={template.imageUrl} alt="Template" className="my-4 max-w-full" />
+//                 )}
+//                 <div style={{
+//                   color: template.style.contentColor,
+//                   fontSize: template.style.contentSize,
+//                   textAlign: template.style.contentAlignment,
+//                 }}>
+//                   {template.content}
+//                 </div>
+//                 <div style={{
+//                   color: template.style.footerColor,
+//                   fontSize: template.style.footerSize,
+//                   textAlign: template.style.footerAlignment,
+//                 }}>
+//                   {template.footer}
+//                 </div>
+//               </div>
+//             </CardContent>
+//           </Card>
+//         </div>
+//       </div>
+//     </DndProvider>
+//   );
+// };
+
+// export default EmailBuilder;
