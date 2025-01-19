@@ -151,6 +151,19 @@ const EmailBuilder = () => {
     newSections.splice(hoverIndex, 0, draggedItem);
     setSections(newSections);
   };
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    const newSections = [...template.sections];
+    [newSections[index - 1], newSections[index]] = [newSections[index], newSections[index - 1]];
+    setTemplate(prev => ({ ...prev, sections: newSections }));
+  };
+  
+  const handleMoveDown = (index: number) => {
+    if (index === template.sections.length - 1) return;
+    const newSections = [...template.sections];
+    [newSections[index], newSections[index + 1]] = [newSections[index + 1], newSections[index]];
+    setTemplate(prev => ({ ...prev, sections: newSections }));
+  };
 
   const handleStyleChange = (section, property, value) => {
     setTemplate(prev => ({
