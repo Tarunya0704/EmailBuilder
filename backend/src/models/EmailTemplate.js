@@ -11,12 +11,24 @@ const EmailTemplateSchema = new mongoose.Schema({
         required: true
     },
     config: {
-        variables: {
-            type: Map,
-            of: String
+        sections: [String],
+        title: String,
+        content: String,
+        imageUrl: String,
+        footer: String,
+        style: {
+            titleColor: String,
+            titleSize: String,
+            titleAlignment: String,
+            contentColor: String,
+            contentSize: String,
+            contentAlignment: String,
+            footerColor: String,
+            footerSize: String,
+            footerAlignment: String,
+            backgroundColor: String
         },
-        images: [String],
-        styles: {
+        variables: {
             type: Map,
             of: String
         }

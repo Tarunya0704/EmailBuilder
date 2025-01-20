@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: {{backgroundColor}};
+            font-family: Arial, sans-serif;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .title {
+            color: {{titleColor}};
+            font-size: {{titleSize}};
+            text-align: {{titleAlignment}};
+            margin-bottom: 20px;
+        }
+        .content {
+            color: {{contentColor}};
+            font-size: {{contentSize}};
+            text-align: {{contentAlignment}};
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .footer {
+            color: {{footerColor}};
+            font-size: {{footerSize}};
+            text-align: {{footerAlignment}};
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="title">{{title}}</div>
+        {{#if imageUrl}}
+        <img src="{{imageUrl}}" alt="Email Image" style="max-width: 100%; height: auto; margin: 20px 0;">
+        {{/if}}
+        <div class="content">{{content}}</div>
+        <div class="footer">{{footer}}</div>
+    </div>
+</body>
+</html>
