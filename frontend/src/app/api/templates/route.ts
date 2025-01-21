@@ -21,7 +21,7 @@ export async function GET() {
     await connectDB();
     const templates = await Template.find().sort({ createdAt: -1 });
     return NextResponse.json(templates);
-  } catch (_error) {
+  } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch templates' }, { status: 500 });
   }
 }
