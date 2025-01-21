@@ -1,71 +1,48 @@
-// import mongoose from 'mongoose';
+import mongoose from "mongoose"
 
-// const MONGODB_URI = process.env.MONGODB_URI!;
-
-// if (!MONGODB_URI) {
-//   throw new Error('Please define the MONGODB_URI environment variable');
-// }
-
-// let cached = global.mongoose;
-
-// if (!cached) {
-//   cached = global.mongoose = { conn: null, promise: null };
-// }
-
-// export async function connectDB() {
-//   if (cached.conn) {
-//     return cached.conn;
-//   }
-
-//   if (!cached.promise) {
-//     cached.promise = mongoose.connect(MONGODB_URI);
-//   }
-//   cached.conn = await cached.promise;
-//   return cached.conn;
-// }
-
-import mongoose from 'mongoose';
-
-declare global {
-  var mongoose: {
-    conn: typeof mongoose | null;
-    promise: Promise<typeof mongoose> | null;
-  };
+interface MongooseConnection {
+  conn: null | { connection: mongoose.Connection }
+  promise: Promise<{ connection: mongoose.Connection }> | null
 }
 
-const MONGODB_URI = process.env.MONGODB_URI!;
+// Use module augmentation to declare the global variable
+declare global {
+  var mongooseConnection: MongooseConnection | undefined
+}
+
+const MONGODB_URI = process.env.MONGODB_URI!
 
 if (!MONGODB_URI) {
-  throw new Error(
-    'Please define the MONGODB_URI environment variable inside .env'
-  );
+  throw new Error("Please define the MONGODB_URI environment variable inside .env")
 }
 
-let cached = global.mongoose;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
+// Initialize the cached connection if it doesn't exist
+if (!global.mongooseConnection) {
+  global.mongooseConnection = { conn: null, promise: null }
 }
+
+const cached = global.mongooseConnection
 
 export async function connectDB() {
   if (cached.conn) {
-    return cached.conn;
+    return cached.conn
   }
 
   if (!cached.promise) {
     const opts = {
       bufferCommands: true,
-    };
+    }
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts);
+    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => ({ connection: mongoose.connection }))
   }
 
   try {
-    cached.conn = await cached.promise;
+    cached.conn = await cached.promise
   } catch (e) {
-    cached.promise = null;
-    throw e;
+    cached.promise = null
+    throw e
   }
 
-  return cached.conn;
+  return cached.conn
 }
+
