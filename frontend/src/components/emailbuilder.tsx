@@ -1,5 +1,6 @@
 "use client"
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { 
@@ -89,10 +90,16 @@ const DraggableSection: React.FC<DraggableSectionProps> = ({ id, index, moveSect
     },
   });
 
+  // Fix: Properly compose the drag and drop refs
+  const dragDropRef = (node: HTMLDivElement | null) => {
+    drag(node);
+    drop(node);
+  };
+
   return (
     <Card className={`mb-6 ${isDragging ? 'opacity-50 border-dashed' : ''}`}>
       <CardContent className="p-6">
-        <div ref={(node) => drag(drop(node))} className="relative">
+        <div ref={dragDropRef} className="relative">
           <div className="absolute left-0 top-1/2 -translate-y-1/2 cursor-move">
             <GripVertical className="h-5 w-5 text-gray-400" />
           </div>
@@ -102,6 +109,8 @@ const DraggableSection: React.FC<DraggableSectionProps> = ({ id, index, moveSect
     </Card>
   );
 };
+
+
 
 
 const StyleControls: React.FC<StyleControlsProps> = ({ section, template, onStyleChange }) => {
@@ -331,7 +340,7 @@ const EmailBuilder: React.FC = () => {
   };
 
   const renderSectionContent = (section: string) => {
-    const components: Record<string, JSX.Element> = {
+    const components: Record<string,React.ReactNode> = {
       title: (
         <div className="space-y-4">
           <Input
@@ -410,15 +419,17 @@ const EmailBuilder: React.FC = () => {
           </div>
           {template.config.imageUrl && (
             <div className="space-y-2">
-              <img
-                src={template.config.imageUrl}
-                alt="Template"
-                className="max-w-full h-auto rounded-lg"
-                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                  console.error('Image failed to load:', template.config.imageUrl);
-                  e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
-                }}
-              />
+             <Image
+  src={template.config.imageUrl}
+  alt="Template"
+  className="max-w-full h-auto rounded-lg"
+  width={500}  // Required for Next.js Image component
+  height={300} // Required for Next.js Image component
+  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+    console.error('Image failed to load:', template.config.imageUrl);
+    e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
+  }}
+/>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -526,15 +537,17 @@ const EmailBuilder: React.FC = () => {
                 
                 {template.config.imageUrl && (
                   <div className="mb-6">
-                    <img
-                      src={template.config.imageUrl}
-                      alt="Template"
-                      className="max-w-full h-auto rounded-lg"
-                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                        console.error('Image failed to load:', template.config.imageUrl);
-                        e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
-                      }}
-                    />
+                   <Image
+  src={template.config.imageUrl}
+  alt="Template"
+  className="max-w-full h-auto rounded-lg"
+  width={500}  // Required for Next.js Image
+  height={300} // Required for Next.js Image
+  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+    console.error('Image failed to load:', template.config.imageUrl);
+    e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
+  }}
+/>
                   </div>
                 )}
 
