@@ -1,9 +1,5 @@
-import { NextResponse } from 'next/server';
-
-export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
+import { NextRequest, NextResponse } from 'next/server'
+export async function GET(request: NextRequest) {
   try {
     await connectDB();
     const template = await Template.findById(params.id);
