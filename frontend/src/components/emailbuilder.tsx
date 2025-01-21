@@ -56,16 +56,17 @@ interface DraggableSectionProps {
   children: React.ReactNode;
 }
 
+interface DragItem {
+  id: string;
+  index: number;
+}
 interface StyleControlsProps {
   section: string;
   template: Template;
   onStyleChange: (section: string, property: string, value: string) => void;
 }
 
-interface DragItem {
-  id: string;
-  index: number;
-}
+
 
 const DraggableSection: React.FC<DraggableSectionProps> = ({ id, index, moveSection, children }) => {
   const [{ isDragging }, drag] = useDrag({
@@ -101,6 +102,7 @@ const DraggableSection: React.FC<DraggableSectionProps> = ({ id, index, moveSect
     </Card>
   );
 };
+
 
 const StyleControls: React.FC<StyleControlsProps> = ({ section, template, onStyleChange }) => {
   const fontSizes = [
