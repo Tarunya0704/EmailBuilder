@@ -20,7 +20,54 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { GripVertical } from "lucide-react";
 
-const DraggableSection = ({ id, index, moveSection, children }) => {
+// Type definitions
+interface TemplateStyle {
+  titleColor: string;
+  titleSize: string;
+  titleAlignment: 'left' | 'center' | 'right';
+  contentColor: string;
+  contentSize: string;
+  contentAlignment: 'left' | 'center' | 'right';
+  footerColor: string;
+  footerSize: string;
+  footerAlignment: 'left' | 'center' | 'right';
+  backgroundColor: string;
+}
+
+interface TemplateConfig {
+  sections: string[];
+  title: string;
+  content: string;
+  imageUrl: string;
+  footer: string;
+  style: TemplateStyle;
+}
+
+interface Template {
+  name: string;
+  layout: string;
+  config: TemplateConfig;
+}
+
+interface DraggableSectionProps {
+  id: string;
+  index: number;
+  moveSection: (dragIndex: number, hoverIndex: number) => void;
+  children: React.ReactNode;
+}
+
+interface StyleControlsProps {
+  section: string;
+  template: Template;
+  onStyleChange: (section: string, property: string, value: string) => void;
+}
+
+interface DragItem {
+  id: string;
+  index: number;
+}
+
+const DraggableSection: React.FC<DraggableSectionProps> = ({ id, index, moveSection, children }) => {
   const [{ isDragging }, drag] = useDrag({
     type: 'section',
     item: { id, index },
@@ -31,7 +78,7 @@ const DraggableSection = ({ id, index, moveSection, children }) => {
 
   const [, drop] = useDrop({
     accept: 'section',
-    hover: (item, monitor) => {
+    hover: (item: DragItem) => {
       if (!item) return;
       const dragIndex = item.index;
       const hoverIndex = index;
@@ -55,7 +102,7 @@ const DraggableSection = ({ id, index, moveSection, children }) => {
   );
 };
 
-const StyleControls = ({ section, template, onStyleChange }) => {
+const StyleControls: React.FC<StyleControlsProps> = ({ section, template, onStyleChange }) => {
   const fontSizes = [
     { label: 'Small', value: '14px' },
     { label: 'Medium', value: '16px' },
@@ -75,7 +122,7 @@ const StyleControls = ({ section, template, onStyleChange }) => {
         <label className="text-sm font-medium">Color</label>
         <Input
           type="color"
-          value={template.config.style[`${section}Color`]}
+          value={template.config.style[`${section}Color` as keyof TemplateStyle]}
           onChange={(e) => onStyleChange(section, 'Color', e.target.value)}
           className="h-9 w-full"
         />
@@ -83,7 +130,7 @@ const StyleControls = ({ section, template, onStyleChange }) => {
       <div className="space-y-1.5">
         <label className="text-sm font-medium">Size</label>
         <Select
-          value={template.config.style[`${section}Size`]}
+          value={template.config.style[`${section}Size` as keyof TemplateStyle]}
           onValueChange={(value) => onStyleChange(section, 'Size', value)}
         >
           <SelectTrigger>
@@ -101,7 +148,7 @@ const StyleControls = ({ section, template, onStyleChange }) => {
       <div className="space-y-1.5">
         <label className="text-sm font-medium">Alignment</label>
         <Select
-          value={template.config.style[`${section}Alignment`]}
+          value={template.config.style[`${section}Alignment` as keyof TemplateStyle]}
           onValueChange={(value) => onStyleChange(section, 'Alignment', value)}
         >
           <SelectTrigger>
@@ -120,9 +167,8 @@ const StyleControls = ({ section, template, onStyleChange }) => {
   );
 };
 
-
-const EmailBuilder = () => {
-  const [template, setTemplate] = useState({
+const EmailBuilder: React.FC = () => {
+  const [template, setTemplate] = useState<Template>({
     name: '',
     layout: 'default.html',
     config: {
@@ -146,10 +192,12 @@ const EmailBuilder = () => {
     }
   });
 
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<boolean>(false);
   const [templateId, setTemplateId] = useState<string>('');
 
-  const moveSection = (dragIndex, hoverIndex) => {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+  const moveSection = (dragIndex: number, hoverIndex: number) => {
     const newSections = [...template.config.sections];
     const draggedItem = newSections[dragIndex];
     newSections.splice(dragIndex, 1);
@@ -163,7 +211,7 @@ const EmailBuilder = () => {
     }));
   };
 
-  const handleStyleChange = (section, property, value) => {
+  const handleStyleChange = (section: string, property: string, value: string) => {
     setTemplate(prev => ({
       ...prev,
       config: {
@@ -176,9 +224,7 @@ const EmailBuilder = () => {
     }));
   };
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-
-  const handleImageUpload = async (e) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
   
@@ -198,13 +244,12 @@ const EmailBuilder = () => {
   
       const data = await response.json();
       
-      // Store the complete URL returned from the server
       if (data.url) {
         setTemplate(prev => ({
           ...prev,
           config: {
             ...prev.config,
-            imageUrl: data.url // This should now be a complete URL
+            imageUrl: data.url
           }
         }));
       }
@@ -215,27 +260,25 @@ const EmailBuilder = () => {
       setUploading(false);
     }
   };
-  
+
   const handleSaveTemplate = async () => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      
       const response = await fetch(`${API_URL}/uploadEmailConfig`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: template.title || 'Untitled Template',
+          name: template.name || 'Untitled Template',
           layout: 'default.html',
           config: {
             variables: {
-              title: template.title,
-              content: template.content,
-              footer: template.footer,
+              title: template.config.title,
+              content: template.config.content,
+              footer: template.config.footer,
             },
-            images: template.imageUrl ? [template.imageUrl] : [],
-            styles: template.style
+            images: template.config.imageUrl ? [template.config.imageUrl] : [],
+            styles: template.config.style
           }
         }),
       });
@@ -252,6 +295,7 @@ const EmailBuilder = () => {
       alert('Failed to save template. Please try again.');
     }
   };
+
   const handleDownloadTemplate = async () => {
     if (!templateId) {
       alert('Please save the template first');
@@ -284,45 +328,8 @@ const EmailBuilder = () => {
     }
   };
 
-  const renderImagePreview = () => {
-    if (!template.config.imageUrl) return null;
-
-    return (
-      <div className="space-y-2">
-        <div className="relative aspect-video w-full overflow-hidden rounded-lg border">
-          <img
-            src={template.config.imageUrl}
-            alt="Template preview"
-            className="object-contain w-full h-full"
-            onError={(e) => {
-              console.error('Image failed to load:', template.config.imageUrl);
-              // You can create a proper placeholder image in your public folder
-              e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
-            }}
-          />
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => setTemplate(prev => ({
-            ...prev,
-            config: {
-              ...prev.config,
-              imageUrl: ''
-            }
-          }))}
-        >
-          Remove Image
-        </Button>
-      </div>
-    );
-  };
-
-
-
-
-  const renderSectionContent = (section) => {
-    const components = {
+  const renderSectionContent = (section: string) => {
+    const components: Record<string, JSX.Element> = {
       title: (
         <div className="space-y-4">
           <Input
@@ -400,31 +407,31 @@ const EmailBuilder = () => {
             {uploading && <span className="text-sm text-gray-500">Uploading...</span>}
           </div>
           {template.config.imageUrl && (
-  <div className="space-y-2">
-    <img
-      src={template.config.imageUrl}
-      alt="Template"
-      className="max-w-full h-auto rounded-lg"
-      onError={(e) => {
-        console.error('Image failed to load:', template.config.imageUrl);
-        e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
-      }}
-    />
-    <Button 
-      variant="outline" 
-      size="sm"
-      onClick={() => setTemplate(prev => ({
-        ...prev,
-        config: {
-          ...prev.config,
-          imageUrl: ''
-        }
-      }))}
-    >
-      Remove Image
-    </Button>
-  </div>
-)}
+            <div className="space-y-2">
+              <img
+                src={template.config.imageUrl}
+                alt="Template"
+                className="max-w-full h-auto rounded-lg"
+                onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                  console.error('Image failed to load:', template.config.imageUrl);
+                  e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
+                }}
+              />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setTemplate(prev => ({
+                  ...prev,
+                  config: {
+                    ...prev.config,
+                    imageUrl: ''
+                  }
+                }))}
+              >
+                Remove Image
+              </Button>
+            </div>
+          )}
         </div>
       )
     };
@@ -446,7 +453,6 @@ const EmailBuilder = () => {
                 className="mt-2"
               />
             </CardHeader>
-    
             <CardContent className="space-y-6">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Background Color</label>
@@ -454,6 +460,7 @@ const EmailBuilder = () => {
                   type="color"
                   value={template.config.style.backgroundColor}
                   onChange={(e) => setTemplate(prev => ({
+                    ...prev,
                     ...prev,
                     config: {
                       ...prev.config,
@@ -516,31 +523,39 @@ const EmailBuilder = () => {
                 </div>
                 
                 {template.config.imageUrl && (
-  <div className="space-y-2">
-    <img
-      src={template.config.imageUrl}
-      alt="Template"
-      className="max-w-full h-auto rounded-lg"
-      onError={(e) => {
-        console.error('Image failed to load:', template.config.imageUrl);
-        e.currentTarget.src = '/placeholder-image.png'; // Add a placeholder image
-      }}
-    />
-    <Button 
-      variant="outline" 
-      size="sm"
-      onClick={() => setTemplate(prev => ({
-        ...prev,
-        config: {
-          ...prev.config,
-          imageUrl: ''
-        }
-      }))}
-    >
-      Remove Image
-    </Button>
-  </div>
-)}
+                  <div className="mb-6">
+                    <img
+                      src={template.config.imageUrl}
+                      alt="Template"
+                      className="max-w-full h-auto rounded-lg"
+                      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+                        console.error('Image failed to load:', template.config.imageUrl);
+                        e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div 
+                  className="mb-6"
+                  style={{
+                    color: template.config.style.contentColor,
+                    fontSize: template.config.style.contentSize,
+                    textAlign: template.config.style.contentAlignment,
+                  }}
+                >
+                  {template.config.content || <span className="text-gray-400">Email Content</span>}
+                </div>
+
+                <div
+                  style={{
+                    color: template.config.style.footerColor,
+                    fontSize: template.config.style.footerSize,
+                    textAlign: template.config.style.footerAlignment,
+                  }}
+                >
+                  {template.config.footer || <span className="text-gray-400">Email Footer</span>}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -551,4 +566,4 @@ const EmailBuilder = () => {
 };
 
 export default EmailBuilder;
-
+                    
