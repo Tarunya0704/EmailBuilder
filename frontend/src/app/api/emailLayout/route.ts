@@ -7,7 +7,7 @@ export async function GET() {
     const layoutPath = path.join(process.cwd(), 'src/templates/layout.html');
     const layout = await fs.readFile(layoutPath, 'utf-8');
     return NextResponse.json({ layout });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: 'Failed to load template' }, { status: 500 });
   }
 }

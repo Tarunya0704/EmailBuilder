@@ -11,7 +11,7 @@ export async function GET(
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
     }
     return NextResponse.json(template);
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: 'Failed to fetch template' }, { status: 500 });
   }
 }
