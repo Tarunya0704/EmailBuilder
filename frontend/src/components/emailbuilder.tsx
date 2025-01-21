@@ -75,7 +75,7 @@ const StyleControls = ({ section, template, onStyleChange }) => {
         <label className="text-sm font-medium">Color</label>
         <Input
           type="color"
-          value={template.style[`${section}Color`]}
+          value={template.config.style[`${section}Color`]}
           onChange={(e) => onStyleChange(section, 'Color', e.target.value)}
           className="h-9 w-full"
         />
@@ -83,7 +83,7 @@ const StyleControls = ({ section, template, onStyleChange }) => {
       <div className="space-y-1.5">
         <label className="text-sm font-medium">Size</label>
         <Select
-          value={template.style[`${section}Size`]}
+          value={template.config.style[`${section}Size`]}
           onValueChange={(value) => onStyleChange(section, 'Size', value)}
         >
           <SelectTrigger>
@@ -101,7 +101,7 @@ const StyleControls = ({ section, template, onStyleChange }) => {
       <div className="space-y-1.5">
         <label className="text-sm font-medium">Alignment</label>
         <Select
-          value={template.style[`${section}Alignment`]}
+          value={template.config.style[`${section}Alignment`]}
           onValueChange={(value) => onStyleChange(section, 'Alignment', value)}
         >
           <SelectTrigger>
@@ -120,82 +120,94 @@ const StyleControls = ({ section, template, onStyleChange }) => {
   );
 };
 
+
 const EmailBuilder = () => {
   const [template, setTemplate] = useState({
-    sections: ['title', 'image', 'content', 'footer'], // Added sections to template state
-    title: '',
-    content: '',
-    imageUrl: '',
-    footer: '',
-    style: {
-      titleColor: '#000000',
-      titleSize: '24px',
-      titleAlignment: 'left',
-      contentColor: '#000000',
-      contentSize: '16px',
-      contentAlignment: 'left',
-      footerColor: '#000000',
-      footerSize: '14px',
-      footerAlignment: 'center',
-      backgroundColor: '#ffffff',
+    name: '',
+    layout: 'default.html',
+    config: {
+      sections: ['title', 'image', 'content', 'footer'],
+      title: '',
+      content: '',
+      imageUrl: '',
+      footer: '',
+      style: {
+        titleColor: '#000000',
+        titleSize: '24px',
+        titleAlignment: 'left',
+        contentColor: '#000000',
+        contentSize: '16px',
+        contentAlignment: 'left',
+        footerColor: '#000000',
+        footerSize: '14px',
+        footerAlignment: 'center',
+        backgroundColor: '#ffffff',
+      }
     }
   });
 
   const [uploading, setUploading] = useState(false);
+  const [templateId, setTemplateId] = useState<string>('');
 
   const moveSection = (dragIndex, hoverIndex) => {
-    const newSections = [...template.sections];
+    const newSections = [...template.config.sections];
     const draggedItem = newSections[dragIndex];
     newSections.splice(dragIndex, 1);
     newSections.splice(hoverIndex, 0, draggedItem);
-    setTemplate(prev => ({ ...prev, sections: newSections }));
-  };
-
-  const handleMoveUp = (index) => {
-    if (index === 0) return;
-    const newSections = [...template.sections];
-    [newSections[index - 1], newSections[index]] = [newSections[index], newSections[index - 1]];
-    setTemplate(prev => ({ ...prev, sections: newSections }));
-  };
-  
-  const handleMoveDown = (index) => {
-    if (index === template.sections.length - 1) return;
-    const newSections = [...template.sections];
-    [newSections[index], newSections[index + 1]] = [newSections[index + 1], newSections[index]];
-    setTemplate(prev => ({ ...prev, sections: newSections }));
+    setTemplate(prev => ({
+      ...prev,
+      config: {
+        ...prev.config,
+        sections: newSections
+      }
+    }));
   };
 
   const handleStyleChange = (section, property, value) => {
     setTemplate(prev => ({
       ...prev,
-      style: {
-        ...prev.style,
-        [`${section}${property}`]: value
+      config: {
+        ...prev.config,
+        style: {
+          ...prev.config.style,
+          [`${section}${property}`]: value
+        }
       }
     }));
   };
 
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+
   const handleImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
+  
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
-
+  
     try {
-      const response = await fetch('/api/uploadImage', {
+      const response = await fetch(`${API_URL}/uploadImage`, {
         method: 'POST',
         body: formData,
       });
-
-      if (!response.ok) throw new Error('Upload failed');
-
+  
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+  
       const data = await response.json();
-      setTemplate(prev => ({
-        ...prev,
-        imageUrl: data.url
-      }));
+      
+      // Store the complete URL returned from the server
+      if (data.url) {
+        setTemplate(prev => ({
+          ...prev,
+          config: {
+            ...prev.config,
+            imageUrl: data.url // This should now be a complete URL
+          }
+        }));
+      }
     } catch (error) {
       console.error('Failed to upload image:', error);
       alert('Failed to upload image. Please try again.');
@@ -203,14 +215,125 @@ const EmailBuilder = () => {
       setUploading(false);
     }
   };
+  
+  const handleSaveTemplate = async () => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      
+      const response = await fetch(`${API_URL}/uploadEmailConfig`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: template.title || 'Untitled Template',
+          layout: 'default.html',
+          config: {
+            variables: {
+              title: template.title,
+              content: template.content,
+              footer: template.footer,
+            },
+            images: template.imageUrl ? [template.imageUrl] : [],
+            styles: template.style
+          }
+        }),
+      });
+  
+      const data = await response.json();
+      if (data.success) {
+        setTemplateId(data.template._id);
+        alert('Template saved successfully!');
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Failed to save template:', error);
+      alert('Failed to save template. Please try again.');
+    }
+  };
+  const handleDownloadTemplate = async () => {
+    if (!templateId) {
+      alert('Please save the template first');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/renderAndDownloadTemplate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ templateId }),
+      });
+
+      if (!response.ok) throw new Error('Download failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${template.name || 'email-template'}.html`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Failed to download template:', error);
+      alert('Failed to download template. Please try again.');
+    }
+  };
+
+  const renderImagePreview = () => {
+    if (!template.config.imageUrl) return null;
+
+    return (
+      <div className="space-y-2">
+        <div className="relative aspect-video w-full overflow-hidden rounded-lg border">
+          <img
+            src={template.config.imageUrl}
+            alt="Template preview"
+            className="object-contain w-full h-full"
+            onError={(e) => {
+              console.error('Image failed to load:', template.config.imageUrl);
+              // You can create a proper placeholder image in your public folder
+              e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
+            }}
+          />
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm"
+          onClick={() => setTemplate(prev => ({
+            ...prev,
+            config: {
+              ...prev.config,
+              imageUrl: ''
+            }
+          }))}
+        >
+          Remove Image
+        </Button>
+      </div>
+    );
+  };
+
+
+
 
   const renderSectionContent = (section) => {
     const components = {
       title: (
         <div className="space-y-4">
           <Input
-            value={template.title}
-            onChange={(e) => setTemplate({ ...template, title: e.target.value })}
+            value={template.config.title}
+            onChange={(e) => setTemplate(prev => ({
+              ...prev,
+              config: {
+                ...prev.config,
+                title: e.target.value
+              }
+            }))}
             placeholder="Enter email title"
             className="w-full"
           />
@@ -224,8 +347,14 @@ const EmailBuilder = () => {
       content: (
         <div className="space-y-4">
           <Textarea
-            value={template.content}
-            onChange={(e) => setTemplate({ ...template, content: e.target.value })}
+            value={template.config.content}
+            onChange={(e) => setTemplate(prev => ({
+              ...prev,
+              config: {
+                ...prev.config,
+                content: e.target.value
+              }
+            }))}
             placeholder="Enter email content"
             rows={6}
             className="w-full"
@@ -240,8 +369,14 @@ const EmailBuilder = () => {
       footer: (
         <div className="space-y-4">
           <Input
-            value={template.footer}
-            onChange={(e) => setTemplate({ ...template, footer: e.target.value })}
+            value={template.config.footer}
+            onChange={(e) => setTemplate(prev => ({
+              ...prev,
+              config: {
+                ...prev.config,
+                footer: e.target.value
+              }
+            }))}
             placeholder="Enter footer text"
             className="w-full"
           />
@@ -264,22 +399,32 @@ const EmailBuilder = () => {
             />
             {uploading && <span className="text-sm text-gray-500">Uploading...</span>}
           </div>
-          {template.imageUrl && (
-            <div className="space-y-2">
-              <img
-                src={template.imageUrl}
-                alt="Template"
-                className="max-w-full h-auto rounded-lg"
-              />
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setTemplate(prev => ({ ...prev, imageUrl: '' }))}
-              >
-                Remove Image
-              </Button>
-            </div>
-          )}
+          {template.config.imageUrl && (
+  <div className="space-y-2">
+    <img
+      src={template.config.imageUrl}
+      alt="Template"
+      className="max-w-full h-auto rounded-lg"
+      onError={(e) => {
+        console.error('Image failed to load:', template.config.imageUrl);
+        e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"%3E%3Cpath fill="%23ccc" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/%3E%3C/svg%3E';
+      }}
+    />
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={() => setTemplate(prev => ({
+        ...prev,
+        config: {
+          ...prev.config,
+          imageUrl: ''
+        }
+      }))}
+    >
+      Remove Image
+    </Button>
+  </div>
+)}
         </div>
       )
     };
@@ -294,22 +439,32 @@ const EmailBuilder = () => {
           <Card>
             <CardHeader>
               <CardTitle>Email Template Builder</CardTitle>
+              <Input
+                value={template.name}
+                onChange={(e) => setTemplate(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Template Name"
+                className="mt-2"
+              />
             </CardHeader>
+    
             <CardContent className="space-y-6">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Background Color</label>
                 <Input
                   type="color"
-                  value={template.style.backgroundColor}
+                  value={template.config.style.backgroundColor}
                   onChange={(e) => setTemplate(prev => ({
                     ...prev,
-                    style: { ...prev.style, backgroundColor: e.target.value }
+                    config: {
+                      ...prev.config,
+                      style: { ...prev.config.style, backgroundColor: e.target.value }
+                    }
                   }))}
                   className="h-9 w-32"
                 />
               </div>
               
-              {template.sections.map((section, index) => (
+              {template.config.sections.map((section, index) => (
                 <DraggableSection
                   key={section}
                   id={section}
@@ -323,21 +478,22 @@ const EmailBuilder = () => {
               <div className="flex gap-4 pt-4">
                 <Button 
                   className="w-full"
-                  onClick={() => console.log('Save template:', template)}
+                  onClick={handleSaveTemplate}
                 >
                   Save Template
                 </Button>
                 <Button 
                   variant="outline"
                   className="w-full"
+                  onClick={handleDownloadTemplate}
                 >
-                  Preview
+                  Download Template
                 </Button>
               </div>
             </CardContent>
           </Card>
         </div>
-        
+              
         <div className="flex-1">
           <Card>
             <CardHeader>
@@ -346,48 +502,45 @@ const EmailBuilder = () => {
             <CardContent>
               <div 
                 className="preview-container p-6 rounded-lg"
-                style={{ backgroundColor: template.style.backgroundColor }}
+                style={{ backgroundColor: template.config.style.backgroundColor }}
               >
                 <div 
                   className="mb-6"
                   style={{
-                    color: template.style.titleColor,
-                    fontSize: template.style.titleSize,
-                    textAlign: template.style.titleAlignment,
+                    color: template.config.style.titleColor,
+                    fontSize: template.config.style.titleSize,
+                    textAlign: template.config.style.titleAlignment,
                   }}
                 >
-                  {template.title || <span className="text-gray-400">Email Title</span>}
+                  {template.config.title || <span className="text-gray-400">Email Title</span>}
                 </div>
                 
-                {template.imageUrl && (
-                  <img 
-                    src={template.imageUrl} 
-                    alt="Template" 
-                    className="my-6 max-w-full rounded-lg" 
-                  />
-                )}
-                
-                <div 
-                  className="mb-6"
-                  style={{
-                    color: template.style.contentColor,
-                    fontSize: template.style.contentSize,
-                    textAlign: template.style.contentAlignment,
-                  }}
-                >
-                  {template.content || <span className="text-gray-400">Email Content</span>}
-                </div>
-                
-                <div 
-                  className="mt-8"
-                  style={{
-                    color: template.style.footerColor,
-                    fontSize: template.style.footerSize,
-                    textAlign: template.style.footerAlignment,
-                  }}
-                >
-                  {template.footer || <span className="text-gray-400">Footer Text</span>}
-                </div>
+                {template.config.imageUrl && (
+  <div className="space-y-2">
+    <img
+      src={template.config.imageUrl}
+      alt="Template"
+      className="max-w-full h-auto rounded-lg"
+      onError={(e) => {
+        console.error('Image failed to load:', template.config.imageUrl);
+        e.currentTarget.src = '/placeholder-image.png'; // Add a placeholder image
+      }}
+    />
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={() => setTemplate(prev => ({
+        ...prev,
+        config: {
+          ...prev.config,
+          imageUrl: ''
+        }
+      }))}
+    >
+      Remove Image
+    </Button>
+  </div>
+)}
               </div>
             </CardContent>
           </Card>
@@ -398,5 +551,4 @@ const EmailBuilder = () => {
 };
 
 export default EmailBuilder;
-
 
