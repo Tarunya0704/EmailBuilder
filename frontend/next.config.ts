@@ -11,6 +11,12 @@ const nextConfig = {
         port: '5000',
         pathname: '/uploads/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'email-builder-5oko.vercel.app',
+        port: '',
+        pathname: '/uploads/**',
+      }
     ],
   },
 }
