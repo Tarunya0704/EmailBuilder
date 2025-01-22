@@ -88,8 +88,8 @@ app.post('/api/uploadImage', upload.single('file'), (req, res) => {
     }
 
     // Make sure to return an absolute URL
-    //const fullUrl = `http://localhost:5000/uploads/${req.file.filename}`;
-    const fullUrl =`https://emailbuilderserver.onrender.com/uploads/${req.file.filename}`;
+    const fullUrl = `https://emailbuilderserver.onrender.com/uploads/${req.file.filename}`;
+    // const fullUrl =const fullUrl =
     
     res.json({
       success: true,
