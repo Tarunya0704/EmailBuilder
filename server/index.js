@@ -89,7 +89,7 @@ app.post('/api/uploadImage', upload.single('file'), (req, res) => {
 
     // Make sure to return an absolute URL
     //const fullUrl = `http://localhost:5000/uploads/${req.file.filename}`;
-    const fullUrl =`https://email-builder-h3ku-8u0qo3brq-tarunya0704s-projects.vercel.app/uploads/${req.file.filename}`;
+    const fullUrl =`https://emailbuilderserver.onrender.com//uploads/${req.file.filename}`;
     
     res.json({
       success: true,
