@@ -244,7 +244,7 @@ const EmailBuilder: React.FC = () => {
     formData.append('file', file);
   
     try {
-      const response = await fetch(`${API_URL}/uploadImage`, {
+      const response = await fetch(`${API_URL}/uploads`, {
         method: 'POST',
         body: formData,
       });
